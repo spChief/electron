@@ -8,6 +8,9 @@
 #include "build/build_config.h"
 
 int main(int argc, char** argv) {
+#if defined(OS_WIN)
+  HMODULE m_hCommCtrlDLL = ::LoadLibrary(_T("comctl32.dll"));
+#endif  // defined(OS_WIN)
   base::TestSuite test_suite(argc, argv);
   return base::LaunchUnitTests(
       argc, argv,
