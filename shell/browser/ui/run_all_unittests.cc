@@ -9,8 +9,8 @@
 
 int main(int argc, char** argv) {
 #if defined(OS_WIN)
-  // Eagerly load comctl32.dll since tests may need it or its dependents.
-  CHECK(::LoadLibrary(L"comctl32.dll"));
+  // Eagerly load advapi32.dll since tests need it.
+  CHECK(::LoadLibrary(L"advapi32.dll"));
 #endif  // defined(OS_WIN)
   base::TestSuite test_suite(argc, argv);
   return base::LaunchUnitTests(
