@@ -170,6 +170,17 @@ class NonZipFileError(ValueError):
   """Raised when a given file does not appear to be a zip"""
 
 
+def zero_zip_date_time(fname):
+  """ Wrap strip-zip zero_zip_date_time within a file opening operation """
+  try:
+    zip = open(fname, 'r+b')
+    _zero_zip_date_time(zip)
+  except:
+    raise NonZipFileError(fname)
+  finally:
+    zip.close()
+
+
 def _zero_zip_date_time(zip_):
   """ Code under MIT from https://github.com/Code0x58/python-stripzip/blob/f1980fcfc55cb6ee1f83a2f72244dd38b3b649f4/stripzip.py """
   archive_size = os.fstat(zip_.fileno()).st_size
@@ -210,7 +221,7 @@ def upload_electron(release, file_path, args):
 
   # Strip zip non determinism before upload, in-place operation
   try:
-    _zero_zip_date_time(file_path)
+    zero_zip_date_time(file_path)
   except NonZipFileError:
     pass
 
