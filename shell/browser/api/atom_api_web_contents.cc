@@ -346,6 +346,18 @@ base::Optional<base::TimeDelta> GetCursorBlinkInterval() {
   return base::nullopt;
 }
 
+#if BUILDFLAG(ENABLE_PRINTING)
+base::string16 GetDefaultPrinterAsync() {
+  base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
+                                                base::BlockingType::MAY_BLOCK);
+
+  auto print_backend = printing::PrintBackend::CreateInstance(
+      nullptr, g_browser_process->GetApplicationLocale());
+  std::string printer_name = print_backend->GetDefaultPrinterName();
+  return base::UTF8ToUTF16(printer_name);
+}
+#endif
+
 }  // namespace
 
 WebContents::WebContents(v8::Isolate* isolate,
@@ -1779,14 +1791,9 @@ void WebContents::Print(gin_helper::Arguments* args) {
 
   // We set the default to the system's default printer and only update
   // if at the Chromium level if the user overrides.
-  auto print_backend = printing::PrintBackend::CreateInstance(
-      nullptr, g_browser_process->GetApplicationLocale());
-  std::string default_printer = print_backend->GetDefaultPrinterName();
-  base::string16 device_name = base::UTF8ToUTF16(default_printer);
-
   // Printer device name as opened by the OS.
+  base::string16 device_name;
   options.Get("deviceName", &device_name);
-  settings.SetStringKey(printing::kSettingDeviceName, device_name);
 
   int scale_factor = 100;
   options.Get("scaleFactor", &scale_factor);
@@ -1872,8 +1879,23 @@ void WebContents::Print(gin_helper::Arguments* args) {
   auto* rfh = focused_frame && focused_frame->HasSelection()
                   ? focused_frame
                   : web_contents()->GetMainFrame();
-  print_view_manager->PrintNow(rfh, silent, std::move(settings),
-                               std::move(callback));
+
+  base::PostTaskAndReplyWithResult(
+      FROM_HERE,
+      {base::ThreadPool(), base::MayBlock(), base::TaskPriority::USER_BLOCKING},
+      base::BindOnce(&GetDefaultPrinterAsync),
+      base::BindOnce(
+          [=](base::string16* printer_name, base::Value print_settings,
+              printing::CompletionCallback print_callback,
+              base::string16 default_printer) {
+            if (printer_name->empty())
+              *printer_name = default_printer;
+            print_settings.SetStringKey(printing::kSettingDeviceName,
+                                        *printer_name);
+            print_view_manager->PrintNow(rfh, silent, std::move(print_settings),
+                                         std::move(print_callback));
+          },
+          &device_name, std::move(settings), std::move(callback)));
 }
 
 std::vector<printing::PrinterBasicInfo> WebContents::GetPrinterList() {
