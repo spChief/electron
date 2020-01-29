@@ -220,7 +220,7 @@ step-setup-env-for-build: &step-setup-env-for-build
       # To find `gn` executable.
       echo 'export CHROMIUM_BUILDTOOLS_PATH="'"$PWD"'/src/buildtools"' >> $BASH_ENV
       # Setup Goma if applicable
-      if [ ! -z "$RAW_GOMA_AUTH" ] && [ "`uname`" == "Linux" ]; then
+      if [ ! -z "$RAW_GOMA_AUTH" ]; then
         export USE_SCCACHE="false"
         echo 'export USE_SCCACHE=false' >> $BASH_ENV
         echo 'export USE_GOMA=true' >> $BASH_ENV
