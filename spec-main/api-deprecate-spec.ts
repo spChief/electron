@@ -7,6 +7,10 @@ describe('deprecate', () => {
     process.throwDeprecation = true
   })
 
+  after(() => {
+    process.throwDeprecation = false
+  })
+
   it('allows a deprecation handler function to be specified', () => {
     const messages: string[] = []
 
