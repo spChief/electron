@@ -224,7 +224,11 @@ step-setup-env-for-build: &step-setup-env-for-build
         export USE_SCCACHE="false"
         echo 'export USE_SCCACHE=false' >> $BASH_ENV
         echo 'export USE_GOMA=true' >> $BASH_ENV
-        echo 'export NUMBER_OF_NINJA_PROCESSES=300' >> $BASH_ENV
+        if [ "`uname`" == "Linux" ]; then
+          echo 'export NUMBER_OF_NINJA_PROCESSES=300' >> $BASH_ENV
+        else
+          echo 'export NUMBER_OF_NINJA_PROCESSES=25' >> $BASH_ENV
+        fi
         echo $RAW_GOMA_AUTH > ~/.goma_oauth2_config
         src/electron/external_binaries/goma/goma_ctl.py ensure_start
       fi
