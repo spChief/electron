@@ -29,6 +29,7 @@ gtk_visibility.patch
 sysroot.patch
 mas_blink_no_private_api.patch
 mas_no_private_api.patch
+mas_disable_remote_layer.patch
 resource_file_conflict.patch
 scroll_bounce_flag.patch
 mas-cfisobjc.patch
