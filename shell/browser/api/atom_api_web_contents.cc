@@ -121,6 +121,10 @@
 #if BUILDFLAG(ENABLE_PRINTING)
 #include "chrome/browser/printing/print_view_manager_basic.h"
 #include "components/printing/common/print_messages.h"
+
+#if defined(OS_WIN)
+#include "printing/backend/win_helper.h"
+#endif
 #endif
 
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
@@ -349,6 +353,26 @@ base::Optional<base::TimeDelta> GetCursorBlinkInterval() {
 #endif
   return base::nullopt;
 }
+
+#if BUILDFLAG(ENABLE_PRINTING)
+// This will return false if no printer with the provided device_name can be
+// found on the network. We need to check this because Chromium does not do
+// sanity checking of device_name validity and so will crash on invalid names.
+bool IsDeviceNameValid(const base::string16& device_name) {
+#if defined(OS_MACOSX)
+  base::ScopedCFTypeRef<CFStringRef> new_printer_id(
+      base::SysUTF16ToCFStringRef(device_name));
+  PMPrinter new_printer = PMPrinterCreateFromPrinterID(new_printer_id.get());
+  bool printer_exists = new_printer != nullptr;
+  PMRelease(new_printer);
+  return printer_exists;
+#elif defined(OS_WIN)
+  printing::ScopedPrinterHandle printer;
+  return printer.OpenPrinterWithName(device_name.c_str());
+#endif
+  return true;
+}
+#endif
 
 }  // namespace
 
@@ -1772,6 +1796,10 @@ void WebContents::Print(mate::Arguments* args) {
   // Printer device name as opened by the OS.
   base::string16 device_name;
   options.Get("deviceName", &device_name);
+  if (!device_name.empty() && !IsDeviceNameValid(device_name)) {
+    args->ThrowError("webContents.print(): Invalid deviceName provided.");
+    return;
+  }
   settings.SetStringKey(printing::kSettingDeviceName, device_name);
 
   int scale_factor = 100;
@@ -2220,6 +2248,34 @@ v8::Local<v8::Promise> WebContents::CapturePage(mate::Arguments* mate_args) {
   return handle;
 }
 
+void WebContents::IncrementCapturerCount(mate::Arguments* mate_args) {
+  gin::Arguments gin_args(mate_args->info());
+  gin_helper::Arguments* args = static_cast<gin_helper::Arguments*>(&gin_args);
+
+  gfx::Size size;
+  bool stay_hidden = false;
+
+  // get size arguments if they exist
+  args->GetNext(&size);
+  // get stayHidden arguments if they exist
+  args->GetNext(&stay_hidden);
+
+  web_contents()->IncrementCapturerCount(size, stay_hidden);
+}
+
+void WebContents::DecrementCapturerCount(mate::Arguments* args) {
+  bool stay_hidden = false;
+
+  // get stayHidden arguments if they exist
+  args->GetNext(&stay_hidden);
+
+  web_contents()->DecrementCapturerCount(stay_hidden);
+}
+
+bool WebContents::IsBeingCaptured() {
+  return web_contents()->IsBeingCaptured();
+}
+
 void WebContents::OnCursorChange(const content::WebCursor& cursor) {
   const content::CursorInfo& info = cursor.info();
 
@@ -2599,6 +2655,9 @@ void WebContents::BuildPrototype(v8::Isolate* isolate,
       .SetMethod("setEmbedder", &WebContents::SetEmbedder)
       .SetMethod("setDevToolsWebContents", &WebContents::SetDevToolsWebContents)
       .SetMethod("getNativeView", &WebContents::GetNativeView)
+      .SetMethod("incrementCapturerCount", &WebContents::IncrementCapturerCount)
+      .SetMethod("decrementCapturerCount", &WebContents::DecrementCapturerCount)
+      .SetMethod("isBeingCaptured", &WebContents::IsBeingCaptured)
       .SetMethod("setWebRTCIPHandlingPolicy",
                  &WebContents::SetWebRTCIPHandlingPolicy)
       .SetMethod("getWebRTCIPHandlingPolicy",
